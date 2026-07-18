@@ -10,12 +10,13 @@ import aiohttp
 import json
 import os
 import threading
+import time
 
 API_TOKEN = "8695836578:AAH7LO-Bu6tMXTjvu4yE-Co38Uqkw09TU5Q"
 ADMIN_ID = 7781474535
-DEEPSEEK_API = "sk-261d671a7ab64ac7a27de8d9ae55153e"
+GEMINI_API = "AQ.Ab8RN6I5tvV2ZCvCU03Hi81xWWmohhnzC76nVALV-hL7Kk3izg"
 USERS_FILE = "users.json"
-PORT = 10000
+PORT = int(os.environ.get("PORT", 10000))
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -55,15 +56,8 @@ def cancel_keyboard():
     kb = [[KeyboardButton(text="🔙 Отмена")]]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
-# ===== ВЕБ-СЕРВЕР ДЛЯ UPTIMEROBOT =====
 async def handle_health(request):
     return web.Response(text="OK")
-
-def start_web():
-    app = web.Application()
-    app.router.add_get("/", handle_health)
-    app.router.add_get("/health", handle_health)
-    web.run_app(app, host="0.0.0.0", port=PORT)
 
 # ===== ОТМЕНА =====
 @dp.message(F.text == "🔙 Отмена")
@@ -99,7 +93,7 @@ async def broadcast_send(message: types.Message, state: FSMContext):
 @dp.message(F.text == "⛄ Правила сервера")
 async def rules(message: types.Message):
     kb = [[InlineKeyboardButton(text="📜 Открыть правила", url="https://t.me/coldworld_pravila")]]
-    await message.answer("Нажмите кнопку ниже:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await message.answer("Нажмите кнопку ниже чтобы открыть правила:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 # ===== AI =====
 @dp.message(F.text == "🤖 AI-ассистент")
@@ -113,18 +107,11 @@ async def ai_answer(message: types.Message, state: FSMContext):
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers={"Authorization": f"Bearer {DEEPSEEK_API}", "Content-Type": "application/json"},
-                json={
-                    "model": "deepseek-chat",
-                    "messages": [
-                        {"role": "system", "content": "Ты AI-помощник сервера ColdWorld."},
-                        {"role": "user", "content": message.text}
-                    ]
-                }
+                f"https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key={GEMINI_API}",
+                json={"contents": [{"parts": [{"text": message.text}]}]}
             ) as resp:
                 data = await resp.json()
-                reply = data["choices"][0]["message"]["content"]
+                reply = data["candidates"][0]["content"]["parts"][0]["text"]
     except:
         reply = "❌ Ошибка AI."
     await temp_msg.delete()
@@ -168,12 +155,12 @@ async def start_cmd(message: types.Message):
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
-    await message.answer("🐛 *Баг-репорт*\n\nОпишите баг:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer("🐛 *Баг-репорт*\n\nОпишите проблему:\n• Никнейм в игре\n• Описание бага\n\nПриложите скриншот.", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_bug)
 async def bug_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    await bot.send_message(ADMIN_ID, f"🐛 *Баг от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await bot.send_message(ADMIN_ID, f"🐛 *Баг от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
     await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
@@ -181,12 +168,12 @@ async def bug_done(message: types.Message, state: FSMContext):
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
-    await message.answer("👤 *Жалоба*\n\nОпишите нарушение:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer("👤 *Жалоба*\n\nУкажите:\n• Никнейм нарушителя\n• Что произошло\n• Доказательства\n\n⚠️ Ложные жалобы наказуемы.", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_player)
 async def player_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    await bot.send_message(ADMIN_ID, f"👤 *Жалоба от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await bot.send_message(ADMIN_ID, f"👤 *Жалоба от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
     await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
@@ -195,16 +182,17 @@ async def player_done(message: types.Message, state: FSMContext):
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
     await message.answer(
-        "📝 *Анкета*\n\n1. Возраст:\n2. Часовой пояс:\n3. Юзернейм:\n"
-        "4. Знание правил:\n5. /ban /mute /kick?:\n6. Опыт:\n"
-        "7. Почему к нам?\n8. Время:\n9. О себе:\n\n⏳ 3–7 дней.",
+        "📝 *Анкета*\n\n"
+        "1. Возраст:\n2. Часовой пояс:\n3. Юзернейм (@):\n4. Знание правил (1-10):\n"
+        "5. Что такое /ban, /mute, /kick?:\n6. Опыт модерации:\n"
+        "7. Почему к нам?\n8. Время (часов/день):\n9. О себе:\n\n⏳ 3–7 дней.",
         parse_mode="Markdown", reply_markup=cancel_keyboard()
     )
 
 @dp.message(Form.waiting_join)
 async def join_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    await bot.send_message(ADMIN_ID, f"📝 *Заявка от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await bot.send_message(ADMIN_ID, f"📝 *Заявка от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
     await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
@@ -212,19 +200,27 @@ async def join_done(message: types.Message, state: FSMContext):
 @dp.message(F.text == "❓ Вопрос администрации")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
-    await message.answer("❓ *Вопрос*\n\nЗадайте вопрос:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer("❓ *Вопрос*\n\nЗадайте вопрос одним сообщением.\nМожете приложить скриншоты.", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_question)
 async def question_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    await bot.send_message(ADMIN_ID, f"❓ *Вопрос от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await bot.send_message(ADMIN_ID, f"❓ *Вопрос от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
     await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
 async def main():
+    # Запускаем веб-сервер ПЕРВЫМ
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    app.router.add_get("/health", handle_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
+    print(f"Web server started on port {PORT}")
+    
     await bot.delete_webhook(drop_pending_updates=True)
-    # Запускаем веб-сервер в отдельном потоке
-    threading.Thread(target=start_web, daemon=True).start()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
