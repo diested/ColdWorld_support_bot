@@ -24,35 +24,41 @@ def main_menu():
         [KeyboardButton(text="👤 Жалоба на игрока / КП")],
         [KeyboardButton(text="📝 Подача на часть проекта")],
         [KeyboardButton(text="❓ Вопрос")],
+        [KeyboardButton(text="🔙 Отмена")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+
+def cancel_keyboard():
+    kb = [[KeyboardButton(text="🔙 Отмена")]]
+    return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
+
+@dp.message(F.text == "🔙 Отмена")
+async def cancel(message: types.Message, state: FSMContext):
+    await state.clear()
+    await message.answer("❌ Действие отменено. Выберите раздел:", reply_markup=main_menu())
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     await message.answer(
         "🛠 *ColdWorld Support Bot*\n\n"
-        "Выберите раздел:\n"
-        "🐛 Баги и дюпы\n"
-        "👤 Жалоба на игрока / КП\n"
-        "📝 Подача на часть проекта\n"
-        "❓ Вопрос администрации\n\n"
-        "Или просто напишите ваш вопрос.",
+        "Выберите раздел:",
         reply_markup=main_menu(),
         parse_mode="Markdown"
     )
 
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
+    await state.set_state(Form.waiting_bug)
     await message.answer(
         "🐛 *Баг-репорт*\n\n"
         "Опишите проблему подробно:\n"
         "• Никнейм в игре\n"
         "• Описание бага\n\n"
-        "Приложите скриншот или видео если возможно.\n"
-        "Администрация проверит обращение.",
-        parse_mode="Markdown"
+        "Приложите скриншот или видео.\n"
+        "Нажмите 🔙 Отмена для выхода.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
     )
-    await state.set_state(Form.waiting_bug)
 
 @dp.message(Form.waiting_bug)
 async def bug_done(message: types.Message, state: FSMContext):
@@ -64,16 +70,18 @@ async def bug_done(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
+    await state.set_state(Form.waiting_player)
     await message.answer(
         "👤 *Жалоба на игрока / КП*\n\n"
         "Укажите в одном сообщении:\n"
         "• Никнейм нарушителя\n"
         "• Что именно произошло\n"
-        "• Доказательства (скриншоты / видео)\n\n"
-        "⚠️ Ложные жалобы наказуемы.",
-        parse_mode="Markdown"
+        "• Доказательства\n\n"
+        "⚠️ Ложные жалобы наказуемы.\n"
+        "Нажмите 🔙 Отмена для выхода.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
     )
-    await state.set_state(Form.waiting_player)
 
 @dp.message(Form.waiting_player)
 async def player_done(message: types.Message, state: FSMContext):
@@ -85,6 +93,7 @@ async def player_done(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "📝 Подача на часть проекта")
 async def join_btn(message: types.Message, state: FSMContext):
+    await state.set_state(Form.waiting_join)
     await message.answer(
         "📝 *Анкета на часть проекта ColdWorld*\n\n"
         "Ответьте на все вопросы одним сообщением:\n\n"
@@ -92,16 +101,16 @@ async def join_btn(message: types.Message, state: FSMContext):
         "2. Часовой пояс / страна:\n"
         "3. Ваш юзернейм в Telegram (@):\n"
         "4. Знание правил проекта (1-10):\n"
-        "5. Что такое /ban, /mute, /kick? Опишите своими словами:\n"
-        "6. Опыт модерации / администрирования (если есть):\n"
-        "7. Почему хотите присоединиться к команде?\n"
-        "8. Сколько времени готовы уделять (часов в день)?\n"
-        "9. Дополнительная информация о себе:\n\n"
+        "5. Что такое /ban, /mute, /kick? Опишите:\n"
+        "6. Опыт модерации (если есть):\n"
+        "7. Почему хотите присоединиться?\n"
+        "8. Сколько времени готовы уделять?\n"
+        "9. Дополнительная информация:\n\n"
         "⏳ Рассмотрение: 3–7 дней.\n"
-        "Ответ придёт в этот же чат.",
-        parse_mode="Markdown"
+        "Нажмите 🔙 Отмена для выхода.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
     )
-    await state.set_state(Form.waiting_join)
 
 @dp.message(Form.waiting_join)
 async def join_done(message: types.Message, state: FSMContext):
@@ -113,14 +122,14 @@ async def join_done(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "❓ Вопрос")
 async def question_btn(message: types.Message, state: FSMContext):
+    await state.set_state(Form.waiting_question)
     await message.answer(
         "❓ *Вопрос администрации*\n\n"
         "Задайте ваш вопрос одним сообщением.\n"
-        "Можете приложить скриншоты.\n\n"
-        "Ответим в ближайшее время!",
-        parse_mode="Markdown"
+        "Нажмите 🔙 Отмена для выхода.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
     )
-    await state.set_state(Form.waiting_question)
 
 @dp.message(Form.waiting_question)
 async def question_done(message: types.Message, state: FSMContext):
