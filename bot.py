@@ -1,3 +1,4 @@
+
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
@@ -87,55 +88,100 @@ async def start_cmd(message: types.Message):
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("❌ Отменено.", reply_markup=main_menu())
+    await message.answer("❌ Действие отменено.", reply_markup=main_menu())
 
 @dp.message(F.text == "⛄ Правила сервера")
 async def rules(message: types.Message):
     kb = [[InlineKeyboardButton(text="📜 Открыть правила", url="https://t.me/coldworld_pravila")]]
-    await message.answer("Нажмите кнопку:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await message.answer("Нажмите кнопку ниже чтобы открыть правила сервера:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
-    await message.answer("🐛 Опишите баг:", reply_markup=cancel_keyboard())
+    await message.answer(
+        "🐛 *Баг-репорт*\n\n"
+        "Опишите проблему подробно:\n"
+        "• Никнейм в игре\n"
+        "• Описание бага\n\n"
+        "Приложите скриншот или видео если возможно.\n"
+        "Администрация проверит обращение.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_bug)
 async def bug_done(message: types.Message, state: FSMContext):
-    await bot.send_message(ADMIN_ID, f"🐛 Баг от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    user = message.from_user
+    await bot.send_message(ADMIN_ID, f"🐛 *Баг от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Отправлено! Администрация проверит.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
-    await message.answer("👤 Опишите нарушение:", reply_markup=cancel_keyboard())
+    await message.answer(
+        "👤 *Жалоба на игрока / КП*\n\n"
+        "Укажите в одном сообщении:\n"
+        "• Никнейм нарушителя\n"
+        "• Что именно произошло\n"
+        "• Доказательства (скриншоты / видео)\n\n"
+        "⚠️ Ложные жалобы наказуемы.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_player)
 async def player_done(message: types.Message, state: FSMContext):
-    await bot.send_message(ADMIN_ID, f"👤 Жалоба от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    user = message.from_user
+    await bot.send_message(ADMIN_ID, f"👤 *Жалоба от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Жалоба отправлена.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "📝 Подача в часть проекта")
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
-    await message.answer("📝 Заполните анкету:\n1. Возраст:\n2. Часовой пояс:\n3. Юзернейм:\n4. Опыт:\n5. Почему к нам?", reply_markup=cancel_keyboard())
+    await message.answer(
+        "📝 *Анкета в часть проекта ColdWorld*\n\n"
+        "Ответьте на все вопросы одним сообщением:\n\n"
+        "1. Возраст:\n"
+        "2. Часовой пояс / страна:\n"
+        "3. Ваш юзернейм в Telegram (@):\n"
+        "4. Знание правил проекта (1-10):\n"
+        "5. Что такое /ban, /mute, /kick? Опишите своими словами:\n"
+        "6. Опыт модерации / администрирования (если есть):\n"
+        "7. Почему хотите присоединиться к команде?\n"
+        "8. Сколько времени готовы уделять (часов в день)?\n"
+        "9. Дополнительная информация о себе:\n\n"
+        "⏳ Рассмотрение: 3–7 дней.\n"
+        "Ответ придёт в этот же чат.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_join)
 async def join_done(message: types.Message, state: FSMContext):
-    await bot.send_message(ADMIN_ID, f"📝 Заявка от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    user = message.from_user
+    await bot.send_message(ADMIN_ID, f"📝 *Заявка от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Заявка отправлена! Ответ придёт сюда же.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "❓ Вопрос администрации")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
-    await message.answer("❓ Задайте вопрос:", reply_markup=cancel_keyboard())
+    await message.answer(
+        "❓ *Вопрос администрации*\n\n"
+        "Задайте ваш вопрос одним сообщением.\n"
+        "Можете приложить скриншоты.\n\n"
+        "Ответим в ближайшее время!",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_question)
 async def question_done(message: types.Message, state: FSMContext):
-    await bot.send_message(ADMIN_ID, f"❓ Вопрос от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    user = message.from_user
+    await bot.send_message(ADMIN_ID, f"❓ *Вопрос от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Вопрос отправлен. Ответим в ближайшее время!", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(Command("admin"))
@@ -143,8 +189,16 @@ async def admin_cmd(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
     await message.answer(
-        "/ban ID — бан\n/unban ID — разбан\n/mute ID — мьют\n/unmute ID — размьют\n"
-        "/banlist — баны\n/stats — статистика\n/reply ID текст — ответ\n/broadcast — рассылка"
+        "🔧 *Админ-панель ColdWorld:*\n\n"
+        "/ban ID — 🚫 Забанить пользователя\n"
+        "/unban ID — ✅ Разбанить\n"
+        "/mute ID — 🤫 Замьютить\n"
+        "/unmute ID — 🔊 Размьютить\n"
+        "/banlist — 📋 Список банов\n"
+        "/stats — 📊 Статистика бота\n"
+        "/reply ID текст — 💬 Ответить\n"
+        "/broadcast — 📢 Рассылка",
+        parse_mode="Markdown"
     )
 
 @dp.message(Command("ban"))
@@ -153,11 +207,11 @@ async def ban_cmd(message: types.Message):
         return
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("/ban ID")
+        await message.answer("❌ Использование: /ban ID")
         return
     bans[args[1]] = True
     save_bans()
-    await message.answer(f"✅ {args[1]} забанен!")
+    await message.answer(f"✅ Пользователь {args[1]} забанен!")
 
 @dp.message(Command("unban"))
 async def unban_cmd(message: types.Message):
@@ -165,11 +219,11 @@ async def unban_cmd(message: types.Message):
         return
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("/unban ID")
+        await message.answer("❌ Использование: /unban ID")
         return
     bans.pop(args[1], None)
     save_bans()
-    await message.answer(f"✅ {args[1]} разбанен!")
+    await message.answer(f"✅ Пользователь {args[1]} разбанен!")
 
 @dp.message(Command("mute"))
 async def mute_cmd(message: types.Message):
@@ -177,11 +231,11 @@ async def mute_cmd(message: types.Message):
         return
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("/mute ID")
+        await message.answer("❌ Использование: /mute ID")
         return
     mutes[args[1]] = True
     save_mutes()
-    await message.answer(f"✅ {args[1]} замьючен!")
+    await message.answer(f"✅ Пользователь {args[1]} замьючен!")
 
 @dp.message(Command("unmute"))
 async def unmute_cmd(message: types.Message):
@@ -189,39 +243,39 @@ async def unmute_cmd(message: types.Message):
         return
     args = message.text.split()
     if len(args) < 2:
-        await message.answer("/unmute ID")
+        await message.answer("❌ Использование: /unmute ID")
         return
     mutes.pop(args[1], None)
     save_mutes()
-    await message.answer(f"✅ {args[1]} размьючен!")
+    await message.answer(f"✅ Пользователь {args[1]} размьючен!")
 
 @dp.message(Command("banlist"))
 async def banlist_cmd(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
-    await message.answer("📋 " + ", ".join(bans.keys()) if bans else "📋 Пусто.")
+    await message.answer("📋 *Бан-лист:* " + ", ".join(bans.keys()) if bans else "📋 Бан-лист пуст.", parse_mode="Markdown")
 
 @dp.message(Command("stats"))
 async def stats_cmd(message: types.Message):
     if message.from_user.id != ADMIN_ID:
         return
-    await message.answer(f"👥 {len(users)} | 🔨 {len(bans)} | 🤫 {len(mutes)}")
+    await message.answer(f"📊 *Статистика:*\n👥 Пользователей: {len(users)}\n🔨 Забанено: {len(bans)}\n🤫 Замьючено: {len(mutes)}", parse_mode="Markdown")
 
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
         return
     await state.set_state(Form.waiting_broadcast)
-    await message.answer("📢 Введите текст:")
+    await message.answer("📢 Введите сообщение для рассылки:")
 
 @dp.message(Form.waiting_broadcast)
 async def broadcast_send(message: types.Message, state: FSMContext):
     for uid in users:
         try:
-            await bot.send_message(uid, f"📢 {message.text}")
+            await bot.send_message(uid, f"📢 *Рассылка ColdWorld:*\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
-    await message.answer("✅ Отправлено!")
+    await message.answer("✅ Рассылка отправлена!")
     await state.clear()
 
 @dp.message(Command("reply"))
@@ -230,13 +284,13 @@ async def reply_cmd(message: types.Message):
         return
     args = message.text.split(maxsplit=2)
     if len(args) < 3:
-        await message.answer("/reply ID текст")
+        await message.answer("❌ Использование: /reply ID текст")
         return
     try:
-        await bot.send_message(int(args[1]), f"📩 Ответ: {args[2]}")
-        await message.answer("✅ Отправлено!")
+        await bot.send_message(int(args[1]), f"📩 *Ответ от администрации:*\n\n{args[2]}", parse_mode="Markdown")
+        await message.answer("✅ Ответ отправлен!")
     except:
-        await message.answer("❌ Ошибка!")
+        await message.answer("❌ Ошибка при отправке!")
 
 async def main():
     app = web.Application()
