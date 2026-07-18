@@ -24,7 +24,6 @@ def main_menu():
         [KeyboardButton(text="👤 Жалоба на игрока / КП")],
         [KeyboardButton(text="📝 Подача на часть проекта")],
         [KeyboardButton(text="❓ Вопрос")],
-        [KeyboardButton(text="🔙 Отмена")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
@@ -34,8 +33,10 @@ def cancel_keyboard():
 
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
-    await state.clear()
-    await message.answer("❌ Действие отменено. Выберите раздел:", reply_markup=main_menu())
+    current_state = await state.get_state()
+    if current_state is not None:
+        await state.clear()
+        await message.answer("❌ Действие отменено. Выберите раздел:", reply_markup=main_menu())
 
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
@@ -54,8 +55,7 @@ async def bug_btn(message: types.Message, state: FSMContext):
         "Опишите проблему подробно:\n"
         "• Никнейм в игре\n"
         "• Описание бага\n\n"
-        "Приложите скриншот или видео.\n"
-        "Нажмите 🔙 Отмена для выхода.",
+        "Приложите скриншот или видео.",
         parse_mode="Markdown",
         reply_markup=cancel_keyboard()
     )
@@ -77,8 +77,7 @@ async def player_btn(message: types.Message, state: FSMContext):
         "• Никнейм нарушителя\n"
         "• Что именно произошло\n"
         "• Доказательства\n\n"
-        "⚠️ Ложные жалобы наказуемы.\n"
-        "Нажмите 🔙 Отмена для выхода.",
+        "⚠️ Ложные жалобы наказуемы.",
         parse_mode="Markdown",
         reply_markup=cancel_keyboard()
     )
@@ -106,8 +105,7 @@ async def join_btn(message: types.Message, state: FSMContext):
         "7. Почему хотите присоединиться?\n"
         "8. Сколько времени готовы уделять?\n"
         "9. Дополнительная информация:\n\n"
-        "⏳ Рассмотрение: 3–7 дней.\n"
-        "Нажмите 🔙 Отмена для выхода.",
+        "⏳ Рассмотрение: 3–7 дней.",
         parse_mode="Markdown",
         reply_markup=cancel_keyboard()
     )
@@ -125,8 +123,7 @@ async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
     await message.answer(
         "❓ *Вопрос администрации*\n\n"
-        "Задайте ваш вопрос одним сообщением.\n"
-        "Нажмите 🔙 Отмена для выхода.",
+        "Задайте ваш вопрос одним сообщением.",
         parse_mode="Markdown",
         reply_markup=cancel_keyboard()
     )
