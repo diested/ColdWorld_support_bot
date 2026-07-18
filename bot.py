@@ -9,7 +9,7 @@ from aiohttp import web
 import json
 import os
 
-API_TOKEN = "8695836578:AAE7c270zFXF_U3SgmdLrJ30OTtS4EqN9oQ"
+API_TOKEN = "8695836578:AAE7c270zFXF_U3SgmdLrJ3oOTtS4EqN9oQ"
 ADMIN_ID = 7781474535
 USERS_FILE = "users.json"
 BANS_FILE = "bans.json"
@@ -144,8 +144,7 @@ async def admin_cmd(message: types.Message):
         return
     await message.answer(
         "/ban ID — бан\n/unban ID — разбан\n/mute ID — мьют\n/unmute ID — размьют\n"
-        "/banlist — баны\n/stats — статистика\n/reply ID текст — ответ\n/broadcast — рассылка",
-        parse_mode="Markdown"
+        "/banlist — баны\n/stats — статистика\n/reply ID текст — ответ\n/broadcast — рассылка"
     )
 
 @dp.message(Command("ban"))
@@ -246,7 +245,6 @@ async def main():
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", PORT)
     await site.start()
-    await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
