@@ -17,6 +17,7 @@ class Form(StatesGroup):
     waiting_player = State()
     waiting_join = State()
     waiting_question = State()
+    waiting_reply = State()
 
 def main_menu():
     kb = [
@@ -31,6 +32,7 @@ def cancel_keyboard():
     kb = [[KeyboardButton(text="🔙 Отмена")]]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
+# ===== ОТМЕНА =====
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
@@ -38,6 +40,27 @@ async def cancel(message: types.Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Действие отменено. Выберите раздел:", reply_markup=main_menu())
 
+# ===== ОТВЕТ ПОЛЬЗОВАТЕЛЮ (ТОЛЬКО АДМИН) =====
+@dp.message(Command("reply"))
+async def reply_cmd(message: types.Message, state: FSMContext):
+    if message.from_user.id != ADMIN_ID:
+        await message.answer("⛔ Только администратор может отвечать!")
+        return
+    
+    args = message.text.split(maxsplit=2)
+    if len(args) < 3:
+        await message.answer("Использование: /reply ID текст\nПример: /reply 7781474535 Привет!")
+        return
+    
+    try:
+        user_id = int(args[1])
+        reply_text = args[2]
+        await bot.send_message(user_id, f"📩 *Ответ от администрации:*\n\n{reply_text}", parse_mode="Markdown")
+        await message.answer(f"✅ Ответ отправлен пользователю {user_id}!")
+    except:
+        await message.answer("❌ Ошибка! Проверьте ID пользователя.")
+
+# ===== СТАРТ =====
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     await message.answer(
@@ -47,6 +70,7 @@ async def start_cmd(message: types.Message):
         parse_mode="Markdown"
     )
 
+# ===== БАГИ =====
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
@@ -68,6 +92,7 @@ async def bug_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Отправлено! Администрация проверит.", reply_markup=main_menu())
     await state.clear()
 
+# ===== ЖАЛОБЫ =====
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
@@ -90,6 +115,7 @@ async def player_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Жалоба отправлена.", reply_markup=main_menu())
     await state.clear()
 
+# ===== ПОДАЧА =====
 @dp.message(F.text == "📝 Подача на часть проекта")
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
@@ -118,6 +144,7 @@ async def join_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Заявка отправлена! Ответ придёт сюда же.", reply_markup=main_menu())
     await state.clear()
 
+# ===== ВОПРОСЫ =====
 @dp.message(F.text == "❓ Вопрос")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
