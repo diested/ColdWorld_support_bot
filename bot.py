@@ -1,13 +1,20 @@
 import asyncio
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiohttp import web
+import aiohttp
+import json
+import os
 
 API_TOKEN = "8695836578:AAH7LO-Bu6tMXTjvu4yE-Co38Uqkw09TU5Q"
 ADMIN_ID = 7781474535
+DEEPSEEK_API = "sk-261d671a7ab64ac7a27de8d9ae55153e"
+USERS_FILE = "users.json"
+PORT = 10000
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher(storage=MemoryStorage())
@@ -17,14 +24,29 @@ class Form(StatesGroup):
     waiting_player = State()
     waiting_join = State()
     waiting_question = State()
-    waiting_reply = State()
+    waiting_ai = State()
+    waiting_broadcast = State()
+
+def load_users():
+    if os.path.exists(USERS_FILE):
+        with open(USERS_FILE) as f:
+            return set(json.load(f))
+    return set()
+
+def save_users(users):
+    with open(USERS_FILE, 'w') as f:
+        json.dump(list(users), f)
+
+users = load_users()
 
 def main_menu():
     kb = [
         [KeyboardButton(text="🐛 Баги и дюпы")],
         [KeyboardButton(text="👤 Жалоба на игрока / КП")],
-        [KeyboardButton(text="📝 Подача на часть проекта")],
-        [KeyboardButton(text="❓ Вопрос")],
+        [KeyboardButton(text="📝 Подача в часть проекта")],
+        [KeyboardButton(text="❓ Вопрос администрации")],
+        [KeyboardButton(text="⛄ Правила сервера")],
+        [KeyboardButton(text="🤖 AI-ассистент")],
     ]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
@@ -32,40 +54,110 @@ def cancel_keyboard():
     kb = [[KeyboardButton(text="🔙 Отмена")]]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
+# ===== ВЕБ-СЕРВЕР ДЛЯ RENDER =====
+async def handle_health(request):
+    return web.Response(text="OK")
+
+# ===== СОХРАНЕНИЕ ПОЛЬЗОВАТЕЛЕЙ =====
+@dp.message()
+async def save_user(message: types.Message):
+    users.add(message.from_user.id)
+    save_users(users)
+
 # ===== ОТМЕНА =====
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
     if current_state is not None:
         await state.clear()
-        await message.answer("❌ Действие отменено. Выберите раздел:", reply_markup=main_menu())
+        await message.answer("❌ Действие отменено.", reply_markup=main_menu())
 
-# ===== ОТВЕТ ПОЛЬЗОВАТЕЛЮ (ТОЛЬКО АДМИН) =====
-@dp.message(Command("reply"))
-async def reply_cmd(message: types.Message, state: FSMContext):
+# ===== РАССЫЛКА =====
+@dp.message(Command("broadcast"))
+async def broadcast_cmd(message: types.Message, state: FSMContext):
     if message.from_user.id != ADMIN_ID:
-        await message.answer("⛔ Только администратор может отвечать!")
         return
-    
+    await state.set_state(Form.waiting_broadcast)
+    await message.answer("📢 Введите сообщение для рассылки:")
+
+@dp.message(Form.waiting_broadcast)
+async def broadcast_send(message: types.Message, state: FSMContext):
+    text = message.text
+    success, fail = 0, 0
+    await message.answer(f"📢 Рассылка на {len(users)} пользователей...")
+    for user_id in users:
+        try:
+            await bot.send_message(user_id, f"📢 *Рассылка ColdWorld:*\n\n{text}", parse_mode="Markdown")
+            success += 1
+        except:
+            fail += 1
+        await asyncio.sleep(0.1)
+    await message.answer(f"✅ Готово! Успешно: {success}, Не доставлено: {fail}")
+    await state.clear()
+
+# ===== ПРАВИЛА =====
+@dp.message(F.text == "⛄ Правила сервера")
+async def rules(message: types.Message):
+    kb = [[InlineKeyboardButton(text="📜 Открыть правила", url="https://t.me/coldworld_pravila")]]
+    await message.answer("Нажмите кнопку ниже:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+
+# ===== AI =====
+@dp.message(F.text == "🤖 AI-ассистент")
+async def ai_start(message: types.Message, state: FSMContext):
+    await state.set_state(Form.waiting_ai)
+    await message.answer("🤖 *AI-ассистент*\n\nЗадайте вопрос:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+
+@dp.message(Form.waiting_ai)
+async def ai_answer(message: types.Message, state: FSMContext):
+    temp_msg = await message.answer("🤔 *Думаю...*", parse_mode="Markdown")
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {DEEPSEEK_API}", "Content-Type": "application/json"},
+                json={
+                    "model": "deepseek-chat",
+                    "messages": [
+                        {"role": "system", "content": "Ты AI-помощник сервера ColdWorld. Отвечай кратко."},
+                        {"role": "user", "content": message.text}
+                    ]
+                }
+            ) as resp:
+                data = await resp.json()
+                reply = data["choices"][0]["message"]["content"]
+    except:
+        reply = "❌ Ошибка AI."
+    await temp_msg.delete()
+    await message.answer(f"🤖 *Ответ:*\n\n{reply}", parse_mode="Markdown", reply_markup=main_menu())
+    await state.clear()
+
+# ===== ОТВЕТ =====
+@dp.message(Command("reply"))
+async def reply_cmd(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return
     args = message.text.split(maxsplit=2)
     if len(args) < 3:
-        await message.answer("Использование: /reply ID текст\nПример: /reply 7781474535 Привет!")
+        await message.answer("/reply ID текст")
         return
-    
     try:
-        user_id = int(args[1])
-        reply_text = args[2]
-        await bot.send_message(user_id, f"📩 *Ответ от администрации:*\n\n{reply_text}", parse_mode="Markdown")
-        await message.answer(f"✅ Ответ отправлен пользователю {user_id}!")
+        await bot.send_message(int(args[1]), f"📩 *Ответ администрации:*\n\n{args[2]}", parse_mode="Markdown")
+        await message.answer("✅ Отправлено!")
     except:
-        await message.answer("❌ Ошибка! Проверьте ID пользователя.")
+        await message.answer("❌ Ошибка!")
 
 # ===== СТАРТ =====
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     await message.answer(
-        "🛠 *ColdWorld Support Bot*\n\n"
-        "Выберите раздел:",
+        "❄️ *Добро пожаловать в ColdWorld!*\n\n"
+        "✨ *Я могу помочь тебе:*\n"
+        "• 🐛 Сообщить о багах и дюпах\n"
+        "• 👤 Подать жалобу на игрока или КП\n"
+        "• 📝 Подать заявку в часть проекта\n"
+        "• ❓ Задать вопрос администрации\n"
+        "• ⛄ Узнать правила сервера\n"
+        "• 🤖 Спросить у AI-ассистента",
         reply_markup=main_menu(),
         parse_mode="Markdown"
     )
@@ -74,96 +166,68 @@ async def start_cmd(message: types.Message):
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
-    await message.answer(
-        "🐛 *Баг-репорт*\n\n"
-        "Опишите проблему подробно:\n"
-        "• Никнейм в игре\n"
-        "• Описание бага\n\n"
-        "Приложите скриншот или видео.",
-        parse_mode="Markdown",
-        reply_markup=cancel_keyboard()
-    )
+    await message.answer("🐛 *Баг-репорт*\n\nОпишите баг:", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_bug)
 async def bug_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    text = f"🐛 *Баг от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}"
-    await bot.send_message(ADMIN_ID, text, parse_mode="Markdown")
-    await message.answer("✅ Отправлено! Администрация проверит.", reply_markup=main_menu())
+    await bot.send_message(ADMIN_ID, f"🐛 *Баг от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
 # ===== ЖАЛОБЫ =====
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
-    await message.answer(
-        "👤 *Жалоба на игрока / КП*\n\n"
-        "Укажите в одном сообщении:\n"
-        "• Никнейм нарушителя\n"
-        "• Что именно произошло\n"
-        "• Доказательства\n\n"
-        "⚠️ Ложные жалобы наказуемы.",
-        parse_mode="Markdown",
-        reply_markup=cancel_keyboard()
-    )
+    await message.answer("👤 *Жалоба*\n\nОпишите нарушение:", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_player)
 async def player_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    text = f"👤 *Жалоба от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}"
-    await bot.send_message(ADMIN_ID, text, parse_mode="Markdown")
-    await message.answer("✅ Жалоба отправлена.", reply_markup=main_menu())
+    await bot.send_message(ADMIN_ID, f"👤 *Жалоба от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
 # ===== ПОДАЧА =====
-@dp.message(F.text == "📝 Подача на часть проекта")
+@dp.message(F.text == "📝 Подача в часть проекта")
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
     await message.answer(
-        "📝 *Анкета на часть проекта ColdWorld*\n\n"
-        "Ответьте на все вопросы одним сообщением:\n\n"
-        "1. Возраст:\n"
-        "2. Часовой пояс / страна:\n"
-        "3. Ваш юзернейм в Telegram (@):\n"
-        "4. Знание правил проекта (1-10):\n"
-        "5. Что такое /ban, /mute, /kick? Опишите:\n"
-        "6. Опыт модерации (если есть):\n"
-        "7. Почему хотите присоединиться?\n"
-        "8. Сколько времени готовы уделять?\n"
-        "9. Дополнительная информация:\n\n"
-        "⏳ Рассмотрение: 3–7 дней.",
-        parse_mode="Markdown",
-        reply_markup=cancel_keyboard()
+        "📝 *Анкета*\n\n"
+        "1. Возраст:\n2. Часовой пояс:\n3. Юзернейм:\n4. Знание правил (1-10):\n"
+        "5. /ban, /mute, /kick?:\n6. Опыт модерации:\n7. Почему к нам?\n"
+        "8. Время (часов/день):\n9. О себе:\n\n⏳ 3–7 дней.",
+        parse_mode="Markdown", reply_markup=cancel_keyboard()
     )
 
 @dp.message(Form.waiting_join)
 async def join_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    text = f"📝 *Заявка от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}"
-    await bot.send_message(ADMIN_ID, text, parse_mode="Markdown")
-    await message.answer("✅ Заявка отправлена! Ответ придёт сюда же.", reply_markup=main_menu())
+    await bot.send_message(ADMIN_ID, f"📝 *Заявка от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
 # ===== ВОПРОСЫ =====
-@dp.message(F.text == "❓ Вопрос")
+@dp.message(F.text == "❓ Вопрос администрации")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
-    await message.answer(
-        "❓ *Вопрос администрации*\n\n"
-        "Задайте ваш вопрос одним сообщением.",
-        parse_mode="Markdown",
-        reply_markup=cancel_keyboard()
-    )
+    await message.answer("❓ *Вопрос*\n\nЗадайте вопрос:", parse_mode="Markdown", reply_markup=cancel_keyboard())
 
 @dp.message(Form.waiting_question)
 async def question_done(message: types.Message, state: FSMContext):
     user = message.from_user
-    text = f"❓ *Вопрос от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}"
-    await bot.send_message(ADMIN_ID, text, parse_mode="Markdown")
-    await message.answer("✅ Вопрос отправлен. Ответим в ближайшее время!", reply_markup=main_menu())
+    await bot.send_message(ADMIN_ID, f"❓ *Вопрос от* {user.full_name} (ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
+    await message.answer("✅ Отправлено!", reply_markup=main_menu())
     await state.clear()
 
 async def main():
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    app.router.add_get("/health", handle_health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", PORT)
+    await site.start()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
