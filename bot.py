@@ -9,6 +9,7 @@ from aiohttp import web
 import aiohttp
 import json
 import os
+import threading
 
 API_TOKEN = "8695836578:AAH7LO-Bu6tMXTjvu4yE-Co38Uqkw09TU5Q"
 ADMIN_ID = 7781474535
@@ -54,15 +55,15 @@ def cancel_keyboard():
     kb = [[KeyboardButton(text="🔙 Отмена")]]
     return ReplyKeyboardMarkup(keyboard=kb, resize_keyboard=True)
 
-# ===== ВЕБ-СЕРВЕР ДЛЯ RENDER =====
+# ===== ВЕБ-СЕРВЕР ДЛЯ UPTIMEROBOT =====
 async def handle_health(request):
     return web.Response(text="OK")
 
-# ===== СОХРАНЕНИЕ ПОЛЬЗОВАТЕЛЕЙ =====
-@dp.message()
-async def save_user(message: types.Message):
-    users.add(message.from_user.id)
-    save_users(users)
+def start_web():
+    app = web.Application()
+    app.router.add_get("/", handle_health)
+    app.router.add_get("/health", handle_health)
+    web.run_app(app, host="0.0.0.0", port=PORT)
 
 # ===== ОТМЕНА =====
 @dp.message(F.text == "🔙 Отмена")
@@ -84,7 +85,6 @@ async def broadcast_cmd(message: types.Message, state: FSMContext):
 async def broadcast_send(message: types.Message, state: FSMContext):
     text = message.text
     success, fail = 0, 0
-    await message.answer(f"📢 Рассылка на {len(users)} пользователей...")
     for user_id in users:
         try:
             await bot.send_message(user_id, f"📢 *Рассылка ColdWorld:*\n\n{text}", parse_mode="Markdown")
@@ -92,7 +92,7 @@ async def broadcast_send(message: types.Message, state: FSMContext):
         except:
             fail += 1
         await asyncio.sleep(0.1)
-    await message.answer(f"✅ Готово! Успешно: {success}, Не доставлено: {fail}")
+    await message.answer(f"✅ Успешно: {success}, Не доставлено: {fail}")
     await state.clear()
 
 # ===== ПРАВИЛА =====
@@ -118,7 +118,7 @@ async def ai_answer(message: types.Message, state: FSMContext):
                 json={
                     "model": "deepseek-chat",
                     "messages": [
-                        {"role": "system", "content": "Ты AI-помощник сервера ColdWorld. Отвечай кратко."},
+                        {"role": "system", "content": "Ты AI-помощник сервера ColdWorld."},
                         {"role": "user", "content": message.text}
                     ]
                 }
@@ -149,6 +149,8 @@ async def reply_cmd(message: types.Message):
 # ===== СТАРТ =====
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
+    users.add(message.from_user.id)
+    save_users(users)
     await message.answer(
         "❄️ *Добро пожаловать в ColdWorld!*\n\n"
         "✨ *Я могу помочь тебе:*\n"
@@ -193,10 +195,9 @@ async def player_done(message: types.Message, state: FSMContext):
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
     await message.answer(
-        "📝 *Анкета*\n\n"
-        "1. Возраст:\n2. Часовой пояс:\n3. Юзернейм:\n4. Знание правил (1-10):\n"
-        "5. /ban, /mute, /kick?:\n6. Опыт модерации:\n7. Почему к нам?\n"
-        "8. Время (часов/день):\n9. О себе:\n\n⏳ 3–7 дней.",
+        "📝 *Анкета*\n\n1. Возраст:\n2. Часовой пояс:\n3. Юзернейм:\n"
+        "4. Знание правил:\n5. /ban /mute /kick?:\n6. Опыт:\n"
+        "7. Почему к нам?\n8. Время:\n9. О себе:\n\n⏳ 3–7 дней.",
         parse_mode="Markdown", reply_markup=cancel_keyboard()
     )
 
@@ -221,13 +222,9 @@ async def question_done(message: types.Message, state: FSMContext):
     await state.clear()
 
 async def main():
-    app = web.Application()
-    app.router.add_get("/", handle_health)
-    app.router.add_get("/health", handle_health)
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", PORT)
-    await site.start()
+    await bot.delete_webhook(drop_pending_updates=True)
+    # Запускаем веб-сервер в отдельном потоке
+    threading.Thread(target=start_web, daemon=True).start()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
