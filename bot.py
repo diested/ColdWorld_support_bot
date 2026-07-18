@@ -27,7 +27,6 @@ class Form(StatesGroup):
     waiting_question = State()
     waiting_broadcast = State()
     waiting_ban = State()
-    waiting_unban = State()
     waiting_mute = State()
 
 def load_json(file):
@@ -73,7 +72,6 @@ def is_banned(user_id):
 def is_muted(user_id):
     return str(user_id) in mutes
 
-# ===== ОТМЕНА =====
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
@@ -81,7 +79,6 @@ async def cancel(message: types.Message, state: FSMContext):
         await state.clear()
         await message.answer("❌ Действие отменено.", reply_markup=main_menu())
 
-# ===== ПРОВЕРКА БАНА =====
 @dp.message()
 async def check_banned(message: types.Message):
     if is_banned(message.from_user.id):
@@ -93,7 +90,6 @@ async def check_banned(message: types.Message):
     users.add(message.from_user.id)
     save_users()
 
-# ===== РАССЫЛКА =====
 @dp.message(Command("broadcast"))
 async def broadcast_cmd(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -115,7 +111,6 @@ async def broadcast_send(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Успешно: {success}, Не доставлено: {fail}")
     await state.clear()
 
-# ===== БАН =====
 @dp.message(Command("ban"))
 async def ban_cmd(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -140,7 +135,6 @@ async def ban_confirm(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Пользователь {data['ban_id']} забанен!")
     await state.clear()
 
-# ===== РАЗБАН =====
 @dp.message(Command("unban"))
 async def unban_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -157,7 +151,6 @@ async def unban_cmd(message: types.Message):
     else:
         await message.answer("❌ Не найден в бане.")
 
-# ===== МЬЮТ =====
 @dp.message(Command("mute"))
 async def mute_cmd(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
@@ -182,7 +175,6 @@ async def mute_confirm(message: types.Message, state: FSMContext):
     await message.answer(f"✅ Пользователь {data['mute_id']} замьючен!")
     await state.clear()
 
-# ===== РАЗМЬЮТ =====
 @dp.message(Command("unmute"))
 async def unmute_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -199,7 +191,6 @@ async def unmute_cmd(message: types.Message):
     else:
         await message.answer("❌ Не найден в мьюте.")
 
-# ===== БАН-ЛИСТ =====
 @dp.message(Command("banlist"))
 async def banlist_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -212,7 +203,6 @@ async def banlist_cmd(message: types.Message):
         text += f"• `{uid}` — {data['reason']}\n"
     await message.answer(text, parse_mode="Markdown")
 
-# ===== СТАТИСТИКА =====
 @dp.message(Command("stats"))
 async def stats_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -225,7 +215,6 @@ async def stats_cmd(message: types.Message):
         parse_mode="Markdown"
     )
 
-# ===== ОТВЕТ =====
 @dp.message(Command("reply"))
 async def reply_cmd(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -240,7 +229,6 @@ async def reply_cmd(message: types.Message):
     except:
         await message.answer("❌ Ошибка!")
 
-# ===== АДМИН-КОМАНДЫ =====
 @dp.message(Command("admin"))
 async def admin_help(message: types.Message):
     if not is_admin(message.from_user.id):
@@ -259,13 +247,11 @@ async def admin_help(message: types.Message):
         parse_mode="Markdown"
     )
 
-# ===== ПРАВИЛА =====
 @dp.message(F.text == "⛄ Правила сервера")
 async def rules(message: types.Message):
     kb = [[InlineKeyboardButton(text="📜 Открыть правила", url="https://t.me/coldworld_pravila")]]
     await message.answer("Нажмите кнопку ниже чтобы открыть правила:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
-# ===== СТАРТ =====
 @dp.message(Command("start"))
 async def start_cmd(message: types.Message):
     users.add(message.from_user.id)
@@ -282,7 +268,6 @@ async def start_cmd(message: types.Message):
         parse_mode="Markdown"
     )
 
-# ===== БАГИ =====
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
@@ -304,7 +289,6 @@ async def bug_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Отправлено! Администрация проверит.", reply_markup=main_menu())
     await state.clear()
 
-# ===== ЖАЛОБЫ =====
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
@@ -326,7 +310,6 @@ async def player_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Жалоба отправлена.", reply_markup=main_menu())
     await state.clear()
 
-# ===== ПОДАЧА =====
 @dp.message(F.text == "📝 Подача в часть проекта")
 async def join_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_join)
@@ -355,7 +338,6 @@ async def join_done(message: types.Message, state: FSMContext):
     await message.answer("✅ Заявка отправлена! Ответ придёт сюда же.", reply_markup=main_menu())
     await state.clear()
 
-# ===== ВОПРОСЫ =====
 @dp.message(F.text == "❓ Вопрос администрации")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
