@@ -67,41 +67,61 @@ async def start_cmd(message: types.Message):
 @dp.message(F.text == "🔙 Отмена")
 async def cancel(message: types.Message, state: FSMContext):
     await state.clear()
-    await message.answer("❌ Отменено.", reply_markup=main_menu())
+    await message.answer("❌ Действие отменено.", reply_markup=main_menu())
 
 @dp.message(F.text == "⛄ Правила сервера")
 async def rules(message: types.Message):
     kb = [[InlineKeyboardButton(text="📜 Открыть правила", url="https://t.me/coldworld_pravila")]]
-    await message.answer("Нажмите кнопку:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
+    await message.answer("Нажмите кнопку ниже чтобы открыть правила сервера:", reply_markup=InlineKeyboardMarkup(inline_keyboard=kb))
 
 @dp.message(F.text == "🐛 Баги и дюпы")
 async def bug_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_bug)
-    await message.answer("🐛 *Баг-репорт*\n\nОпишите проблему:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer(
+        "🐛 *Баг-репорт*\n\n"
+        "Опишите проблему подробно:\n"
+        "• Никнейм в игре\n"
+        "• Описание бага\n\n"
+        "Приложите скриншот или видео если возможно.\n"
+        "Администрация проверит обращение.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_bug)
 async def bug_done(message: types.Message, state: FSMContext):
+    user = message.from_user
     for aid in admins:
         try:
-            await bot.send_message(aid, f"🐛 Баг от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
+            await bot.send_message(aid, f"🐛 *Баг от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    await message.answer("✅ Отправлено! Администрация проверит.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "👤 Жалоба на игрока / КП")
 async def player_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_player)
-    await message.answer("👤 *Жалоба*\n\nОпишите нарушение:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer(
+        "👤 *Жалоба на игрока / КП*\n\n"
+        "Укажите в одном сообщении:\n"
+        "• Никнейм нарушителя\n"
+        "• Что именно произошло\n"
+        "• Доказательства (скриншоты / видео)\n\n"
+        "⚠️ Ложные жалобы наказуемы.",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_player)
 async def player_done(message: types.Message, state: FSMContext):
+    user = message.from_user
     for aid in admins:
         try:
-            await bot.send_message(aid, f"👤 Жалоба от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
+            await bot.send_message(aid, f"👤 *Жалоба от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    await message.answer("✅ Жалоба отправлена.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "📝 Подача в часть проекта")
@@ -131,12 +151,13 @@ async def join_btn(message: types.Message, state: FSMContext):
 
 @dp.message(Form.waiting_join)
 async def join_done(message: types.Message, state: FSMContext):
+    user = message.from_user
     for aid in admins:
         try:
-            await bot.send_message(aid, f"📝 Заявка в часть проекта от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
+            await bot.send_message(aid, f"📝 *Заявка в часть проекта от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    await message.answer("✅ Заявка отправлена! Ответ придёт сюда же.", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(F.text == "📹 Подача на медиа-творца")
@@ -165,9 +186,10 @@ async def media_btn(message: types.Message, state: FSMContext):
 
 @dp.message(Form.waiting_media)
 async def media_done(message: types.Message, state: FSMContext):
+    user = message.from_user
     for aid in admins:
         try:
-            await bot.send_message(aid, f"📹 Заявка на медиа-творца от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
+            await bot.send_message(aid, f"📹 *Заявка на медиа-творца от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
     await message.answer("✅ Отправлено!", reply_markup=main_menu())
@@ -176,16 +198,24 @@ async def media_done(message: types.Message, state: FSMContext):
 @dp.message(F.text == "❓ Вопрос администрации")
 async def question_btn(message: types.Message, state: FSMContext):
     await state.set_state(Form.waiting_question)
-    await message.answer("❓ *Вопрос*\n\nЗадайте вопрос:", parse_mode="Markdown", reply_markup=cancel_keyboard())
+    await message.answer(
+        "❓ *Вопрос администрации*\n\n"
+        "Задайте ваш вопрос одним сообщением.\n"
+        "Можете приложить скриншоты.\n\n"
+        "Ответим в ближайшее время!",
+        parse_mode="Markdown",
+        reply_markup=cancel_keyboard()
+    )
 
 @dp.message(Form.waiting_question)
 async def question_done(message: types.Message, state: FSMContext):
+    user = message.from_user
     for aid in admins:
         try:
-            await bot.send_message(aid, f"❓ Вопрос от {message.from_user.full_name} (ID: {message.from_user.id})\n\n{message.text}")
+            await bot.send_message(aid, f"❓ *Вопрос от* {user.full_name} (@{user.username or 'нет'}, ID: {user.id})\n\n{message.text}", parse_mode="Markdown")
         except:
             pass
-    await message.answer("✅ Отправлено!", reply_markup=main_menu())
+    await message.answer("✅ Вопрос отправлен. Ответим в ближайшее время!", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(Command("admin"))
@@ -272,7 +302,7 @@ async def broadcast_cmd(message: types.Message, state: FSMContext):
     if not is_admin(message.from_user.id):
         return
     await state.set_state(Form.waiting_broadcast)
-    await message.answer(f"📢 Введите текст (получат {len(users)} чел.):")
+    await message.answer(f"📢 Введите текст рассылки (получат {len(users)} чел.):")
 
 @dp.message(Form.waiting_broadcast)
 async def broadcast_send(message: types.Message, state: FSMContext):
@@ -284,7 +314,7 @@ async def broadcast_send(message: types.Message, state: FSMContext):
             await asyncio.sleep(0.1)
         except:
             fail += 1
-    await message.answer(f"✅ {ok} | ❌ {fail}", reply_markup=main_menu())
+    await message.answer(f"✅ Отправлено: {ok}\n❌ Не доставлено: {fail}", reply_markup=main_menu())
     await state.clear()
 
 @dp.message(Command("reply"))
